@@ -61,6 +61,62 @@ def dosya_bilgilerini_oku():
         sonuc_etiketi.config(text=rapor)
 
 
+def klasor_okuma():
+    # 'su_anki_klasor' değişkenini global yaparak, tüm fonksiyonların bu yola erişmesini sağlıyoruz.
+    global su_anki_klasor
+
+    su_anki_klasor = filedialog.askdirectory()
+    if not su_anki_klasor:
+        return
+
+    liste_kutusu.delete(0, tk.END)
+
+    if os.path.exists(su_anki_klasor):
+        icerik_listesi = os.listdir(su_anki_klasor)
+        for isim in icerik_listesi:
+            liste_kutusu.insert(tk.END, f"📄 {isim}")
+
+    else:
+        liste_kutusu.insert(tk.END, "HATA: Klasör yoluna ulaşılamadı!")
+
+            # TEST İÇİN BUNU EKLEYİN: Bilgiler etikete gitmiyorsa terminale basıyor mu bakalım
+    print("Döngü bitti, hazırlanan metin:\n", file)
+
+        # Hazırladığımız bu yeni listeyi ekrandaki etiketimize basıyoruz.
+    sonuc_etiketi.config(text=file)
+
+
+# 'event' parametresi, çift tıklama eyleminin tüm bilgilerini (koordinat, tıklanan yer vb.) otomatik taşır.
+def listeye_cift_tıklandi(event):
+    # 1. Kullanıcının listeden hangi satırı seçtiğini index (sıra numarası) olarak alıyoruz.
+    secilen_index = liste_kutusu.curselection()
+
+    # Eğer kullanıcı boş bir yere tıkladıysa işlem yapma
+    if not secilen_index:
+        return
+
+    # 2. Seçilen satırdaki yazıyı alıyoruz (Örn: "📄 Vilog.mp4")
+    secilen_metin = liste_kutusu.get(secilen_index)
+    dosya_adi = secilen_metin.replace("📄 ", "")
+
+    # os.path.join() klasör yolu ile dosya adını güvenli bir şekilde birleştirir.
+    # Örn: "D:\Videolar" + "Vilog.mp4" -> "D:\Videolar\Vilog.mp4"
+
+    tam_dosya_yolu = os.path.join(su_anki_klasor, dosya_adi)
+
+    # os.startfile() fonksiyonu, Windows'ta o dosyaya çift tıklamışsınız gibi
+    # dosyayı kendi varsayılan programıyla (VLC, Fotoğraflar, Word vb.) açar.
+    if os.path.exists(tam_dosya_yolu):
+        os.startfile(tam_dosya_yolu)
+
+    # 3. Başındaki "📄 " emojisini temizleyip sadece gerçek dosya adını alıyoruz.
+    # .replace() fonksiyonu metindeki bir karakteri başka bir karakterle değiştirir.
+    dosya_adi = secilen_metin.replace("📄 ", "")
+
+    # Şimdi çok önemli bir sorunumuz var: Bilgisayar bu dosyanın HANGİ klasörde olduğunu bilmiyor.
+    # Bunu çözmek için 'klasor_icerigini_listele' fonksiyonunda seçtiğimiz klasör yoluna ihtiyacımız var!
+
+
 pencere = tk.Tk() # tk.Tk() komutu, uygulamamızın ana gövdesini oluşturan boş ve görünmez bir pencere (tuval) üretir.
 pencere.title("Asimple")  #Ekranda açılacak olan pencerenin sol üst köşesindeki başlık metnini belirler.
 pencere.geometry("400x300") # Pencerenin genişlik ve yükseklik boyutunu piksel cinsinden ayarlar (Genişlik x Yükseklik).
@@ -76,11 +132,38 @@ buton = tk.Button(pencere, text= "Dosya Seç ve Bilgi Oku",  command=dosya_bilgi
 # 'pady=40' parametresi, butonun üstünden ve altından 40 piksellik dikey boşluk bırakarak sayfada sıkışık durmamasını sağlar.
 buton.pack(pady=20)
 
+klasor_butonu = tk.Button(pencere, text="Klasör Seç ve İçeriğini Listele", command=klasor_okuma)
+klasor_butonu.pack(pady=10)
+
 sonuc_etiketi = tk.Label(pencere, text= "Lütfen bir dosya seçin...", justify="left", font=("Times New Roman", 10))
 sonuc_etiketi.pack(pady=20)
 
 # mainloop() Python'a "Bu pencereyi ekranda çiz ve kullanıcı kapatma (X) butonuna basana kadar sürekli açık tut, arkada döngüye al" emrini verir.
 # Bu satırın altında kalan hiçbir kod pencere kapatılmadan çalışmaz. O yüzden her zaman en sonda yer alır.
+
+# 1. Klasör listesini göstereceğimiz kutu (Listbox)
+# 'width' genişliği, 'height' ise ekranda tek seferde kaç satır görüneceğini belirler.
+liste_kutusu = tk.Listbox(pencere, width=70, height=15, font=("Arial", 10))
+
+# 2. Sağa koyacağımız dikey kaydırma çubuğu (Scrollbar)
+kaydirma_cubugu = tk.Scrollbar(pencere, orient="vertical")
+
+# 3. Bu iki parçayı birbirine evlendiriyoruz (Bağlıyoruz)
+# Liste kutusu kaydırıldığında çubuğu hareket ettir, çubuk çekildiğinde listeyi kaydır.
+liste_kutusu.config(yscrollcommand=kaydirma_cubugu.set)
+kaydirma_cubugu.config(command=liste_kutusu.yview)
+
+# 4. Ekrana yerleştirme (Pack)
+# 'side=tk.RIGHT' çubuğu sağa yaslar, 'fill=tk.Y' yukarıdan aşağıya uzatır.
+kaydirma_cubugu.pack(side=tk.RIGHT, fill=tk.Y)
+# Liste kutusunu da sola yaslayıp kalan boşluğu doldurtuyoruz.
+liste_kutusu.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=20, pady=10)
+# '<Double-Button-1>' ifadesi, fare sol tuşuna çift tıklama anlamına gelen evrensel bir Git/Tkinter kodudur.
+liste_kutusu.bind('<Double-Button-1>', listeye_cift_tıklandi)
+
+
+
+
 pencere.mainloop()
 
 
